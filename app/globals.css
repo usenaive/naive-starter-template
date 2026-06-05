@@ -1,0 +1,127 @@
+@import "tailwindcss";
+
+/* Geist Sans. File in public/fonts/. */
+@font-face {
+  font-family: "Geist Sans";
+  src: url("/fonts/Geist-Variable.woff2") format("woff2");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* ChatGPT-style dark theme. */
+:root {
+  color-scheme: dark;
+  --radius: 0.75rem;
+
+  --background: #212121;      /* main canvas */
+  --sidebar: #171717;         /* darker rail */
+  --foreground: #ececec;      /* primary text */
+  --card: #2f2f2f;            /* raised panels */
+  --surface: #303030;         /* composer / inputs */
+  --elevated: #353535;        /* hover on surfaces */
+  --primary: #ffffff;
+  --primary-foreground: #0d0d0d;
+  --muted: #2f2f2f;
+  --muted-foreground: #b4b4b4;
+  --accent: #2f2f2f;
+  --border: rgba(255, 255, 255, 0.1);
+  --border-strong: rgba(255, 255, 255, 0.22);
+  --ring: rgba(255, 255, 255, 0.3);
+
+  --emerald: #3fb950;
+  --amber: #d29922;
+  --red: #f85149;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-sidebar: var(--sidebar);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-surface: var(--surface);
+  --color-elevated: var(--elevated);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-border: var(--border);
+  --color-ring: var(--ring);
+
+  --font-sans: "Geist Sans", ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  --font-mono: ui-monospace, "SF Mono", "IBM Plex Mono", Menlo, Monaco, Consolas, "Courier New", monospace;
+
+  --radius-sm: 0.5rem;
+  --radius-md: 0.625rem;
+  --radius-lg: var(--radius);
+}
+
+@layer base {
+  * { border-color: var(--border); }
+  html, body {
+    background: var(--background);
+    color: var(--foreground);
+    font-family: var(--font-sans);
+    font-size: 14px;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  body { height: 100%; }
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-sans);
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    text-wrap: balance;
+  }
+  a, button:not(:disabled), [role="button"] { cursor: pointer; }
+}
+
+.section-eyebrow {
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--muted-foreground);
+  font-size: 11px;
+}
+
+*::-webkit-scrollbar { width: 8px; height: 8px; }
+*::-webkit-scrollbar-track { background: transparent; }
+*::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.14); border-radius: 4px; }
+*::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.24); }
+
+.row-hover:hover { background: color-mix(in oklab, var(--foreground) 6%, transparent); }
+
+.dotted-bg {
+  background-image: radial-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+  background-size: 16px 16px;
+}
+
+/* Markdown rendering in chat */
+.md > :first-child { margin-top: 0; }
+.md > :last-child { margin-bottom: 0; }
+.md p { margin: 0.5em 0; }
+.md ul, .md ol { margin: 0.5em 0; padding-left: 1.25em; }
+.md ul { list-style: disc; }
+.md ol { list-style: decimal; }
+.md li { margin: 0.15em 0; }
+.md a { color: #7eb6ff; text-decoration: underline; }
+.md code {
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+  background: rgba(255, 255, 255, 0.08);
+  padding: 0.1em 0.35em;
+  border-radius: 4px;
+}
+.md pre {
+  background: #0d0d0d;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0.85em;
+  overflow-x: auto;
+  margin: 0.6em 0;
+}
+.md pre code { background: none; padding: 0; }
+.md h1, .md h2, .md h3 { margin: 0.6em 0 0.3em; font-size: 1.05em; }
+.md strong { font-weight: 600; }
+.md blockquote { border-left: 2px solid var(--border); padding-left: 0.75em; color: var(--muted-foreground); margin: 0.5em 0; }
