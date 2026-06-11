@@ -11,9 +11,8 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.32.1",
     "@libsql/client": "^0.14.0",
-    "@usenaive-sdk/node": "^0.3.0",
+    "@usenaive-sdk/node": "^0.5.0",
     "better-auth": "^1.2.7",
     "drizzle-orm": "^0.45.2",
     "lucide-react": "^1.17.0",
