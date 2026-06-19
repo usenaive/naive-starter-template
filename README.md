@@ -15,8 +15,8 @@ Every end-user signs up and gets **their own AI assistant** that connects third-
 
 ![License](https://img.shields.io/badge/license-MIT-black?style=flat-square)
 ![Next.js](https://img.shields.io/badge/Next.js-15-black?style=flat-square&logo=next.js)
-![SDK](https://img.shields.io/badge/%40usenaive--sdk%2Fnode-%5E0.5.0-black?style=flat-square)
-![Anthropic](https://img.shields.io/badge/Claude-Sonnet_4.5-black?style=flat-square&logo=anthropic)
+![SDK](https://img.shields.io/badge/%40usenaive--sdk%2Fnode-%5E0.8.0-black?style=flat-square)
+![LLM](https://img.shields.io/badge/LLM-Naive_router_(OpenRouter)-black?style=flat-square)
 
 [Quick start](#-quick-start) · [How it works](#-how-it-works) · [Deploy](#-deploy-your-own) · [Customize](#-customizing)
 
@@ -31,11 +31,13 @@ Every end-user signs up and gets **their own AI assistant** that connects third-
 | 💬 | **Chat** | A streaming agent loop powered by `agentTools()` — searches/connects apps, runs capabilities, and calls native primitives. Its LLM calls run through Naive's LLM router (`client.llm`, OpenRouter — any of 300+ models). |
 | 💳 | **Cards** | Per-user virtual payment cards (`client.cards`). |
 | 📬 | **Email** | Per-user inboxes on a Naive domain (`client.email`). |
+| 📈 | **Trading** | Per-user brokerage via OAuth — trade stocks, options & crypto (`client.trading`), approval-gated. |
 | 🔌 | **Connections** | Connect third-party apps (Gmail, GitHub, Slack, …) per user. |
 | 🔐 | **Credentials** | A per-user, KMS-encrypted vault (`client.vault`). |
 | ✅ | **Approvals** | Human-in-the-loop queue for sensitive agent actions. |
+| 🪙 | **Billing** | Workspace credit balance + per-tenant subscription/usage (`/v1/status`, `client.billing`). |
 
-> Cards & Email are sample primitive pages — the same `client.<primitive>` pattern extends to domains, verification, formation, and social.
+> Cards, Email & Trading are sample primitive pages — the same `client.<primitive>` pattern extends to domains, verification, formation, and social.
 
 ## 🤔 Why this template
 
@@ -157,6 +159,8 @@ flowchart TB
 │   │   ├── chat/route.ts    # 💬 streaming agent loop (agentTools + client.llm/OpenRouter)
 │   │   ├── cards/route.ts   # 💳 cards primitive
 │   │   ├── email/route.ts   # 📬 email primitive
+│   │   ├── trading/route.ts # 📈 trading primitive (OAuth + orders)
+│   │   ├── billing/route.ts # 🪙 tenant billing  ·  status/route.ts # workspace credits
 │   │   ├── connections/     # 🔌 third-party app connections
 │   │   ├── vault/route.ts   # 🔐 credentials vault
 │   │   ├── approvals/       # ✅ human-in-the-loop queue
@@ -187,6 +191,7 @@ flowchart TB
 | `NAIVE_API_URL` | ➖ | Naive API base. Defaults to `https://api.usenaive.ai`. |
 | `NAIVE_LLM_MODEL` | ➖ | OpenRouter model id for the chat loop. Defaults to `anthropic/claude-sonnet-4.6`. |
 | `NAIVE_ACCOUNT_KIT_ID` | ➖ | Account Kit for new users. Blank = workspace default. |
+| `NAIVE_SHOW_WORKSPACE_CREDITS` | ➖ | Show the shared workspace credit balance in-app (sidebar + Billing). Operator-only — off in prod by default, on in dev. Set `true` for an internal/admin build. |
 | `DATABASE_URL` | ➖ | libSQL/SQLite URL. Defaults to `file:./dev.db`. |
 | `DATABASE_AUTH_TOKEN` | ➖ | Auth token for a hosted libSQL/Turso database. |
 
@@ -207,6 +212,8 @@ npm run build       # production build
 - [ ] 🌐 *"Is `example.com` available?"* → domain check (no purchase)
 - [ ] 🔐 *"Store my OpenAI key as `openai.key`"* → appears in **Credentials**
 - [ ] 💳 *"Issue a $50 virtual card"* → if gated, shows in **Approvals**; approve to run
+- [ ] 📈 *"Connect my brokerage"* then *"buy $25 of BTC"* → OAuth link; order shows in **Approvals** if gated
+- [ ] 🪙 Open **Billing** → workspace credit balance reflects your activity (decrements as you use primitives)
 
 ---
 
@@ -233,7 +240,7 @@ Standard Next.js app — deploys anywhere. For [Vercel](https://vercel.com):
 
 ## 🛟 Troubleshooting
 
-- 🤖 **Agent says a built-in feature "isn't available"** → ensure `@usenaive-sdk/node` is `^0.5.0`+ and restart `npm run dev` (Next caches resolved deps).
+- 🤖 **Agent says a built-in feature "isn't available"** → ensure `@usenaive-sdk/node` is `^0.8.0`+ and restart `npm run dev` (Next caches resolved deps).
 - ⏳ **A sensitive action never runs** → it's waiting in **Approvals** (gated by the Account Kit). Approve it, or relax the kit policy.
 - 🔁 **Auth redirect loops in production** → set `BETTER_AUTH_URL` to your exact deployed origin.
 - 🗄️ **`db:push` fails on Vercel** → run it against the hosted DB with the production `DATABASE_URL`/`DATABASE_AUTH_TOKEN`.
