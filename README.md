@@ -15,8 +15,8 @@ Every end-user signs up and gets **their own AI assistant** that connects third-
 
 ![License](https://img.shields.io/badge/license-MIT-black?style=flat-square)
 ![Next.js](https://img.shields.io/badge/Next.js-15-black?style=flat-square&logo=next.js)
-![SDK](https://img.shields.io/badge/%40usenaive--sdk%2Fnode-%5E0.3.0-black?style=flat-square)
-![Anthropic](https://img.shields.io/badge/Claude-Sonnet_4.5-black?style=flat-square&logo=anthropic)
+![SDK](https://img.shields.io/badge/%40usenaive--sdk%2Fnode-%5E0.8.0-black?style=flat-square)
+![LLM](https://img.shields.io/badge/LLM-Naive_router_(OpenRouter)-black?style=flat-square)
 
 [Quick start](#-quick-start) · [How it works](#-how-it-works) · [Deploy](#-deploy-your-own) · [Customize](#-customizing)
 
@@ -28,14 +28,16 @@ Every end-user signs up and gets **their own AI assistant** that connects third-
 
 | | Page | What it shows |
 | --- | --- | --- |
-| 💬 | **Chat** | A streaming agent loop powered by `agentTools()` — searches/connects apps, runs capabilities, and calls native primitives. |
+| 💬 | **Chat** | A streaming agent loop powered by `agentTools()` — searches/connects apps, runs capabilities, and calls native primitives. Its LLM calls run through Naive's LLM router (`client.llm`, OpenRouter — any of 300+ models). |
 | 💳 | **Cards** | Per-user virtual payment cards (`client.cards`). |
 | 📬 | **Email** | Per-user inboxes on a Naive domain (`client.email`). |
+| 📈 | **Trading** | Per-user brokerage via OAuth — trade stocks, options & crypto (`client.trading`), approval-gated. |
 | 🔌 | **Connections** | Connect third-party apps (Gmail, GitHub, Slack, …) per user. |
 | 🔐 | **Credentials** | A per-user, KMS-encrypted vault (`client.vault`). |
 | ✅ | **Approvals** | Human-in-the-loop queue for sensitive agent actions. |
+| 🪙 | **Billing** | Workspace credit balance + per-tenant subscription/usage (`/v1/status`, `client.billing`). |
 
-> Cards & Email are sample primitive pages — the same `client.<primitive>` pattern extends to domains, verification, formation, and social.
+> Cards, Email & Trading are sample primitive pages — the same `client.<primitive>` pattern extends to domains, verification, formation, and social.
 
 ## 🤔 Why this template
 
@@ -53,14 +55,14 @@ This repo shows the **entire integration** in a small, readable codebase you can
 - ⚡ **Next.js 15** (App Router) — UI + API routes
 - 🔑 **BetterAuth** — email/password auth
 - 🗄️ **Drizzle ORM** + **libSQL/SQLite** — zero-infra local DB
-- 🧠 **Anthropic Claude** — the chat model
+- 🧠 **Any model via Naive** — the chat routes through Naive's LLM router (OpenRouter; 300+ models, defaults to Claude Sonnet), no direct provider key
 - 🧩 **@usenaive-sdk/node** — multi-tenant business infrastructure
 
 ---
 
 ## 🚀 Deploy your own
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/usenaive/naive-starter&env=ANTHROPIC_API_KEY,NAIVE_API_KEY,BETTER_AUTH_SECRET,BETTER_AUTH_URL,DATABASE_URL,DATABASE_AUTH_TOKEN&envDescription=Naive%20%2B%20Anthropic%20%2B%20Auth%20%2B%20Database%20credentials&project-name=naive-starter&repository-name=naive-starter)
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/usenaive/naive-starter&env=NAIVE_API_KEY,BETTER_AUTH_SECRET,BETTER_AUTH_URL,DATABASE_URL,DATABASE_AUTH_TOKEN&envDescription=Naive%20%2B%20Auth%20%2B%20Database%20credentials&project-name=naive-starter&repository-name=naive-starter)
 
 > ⚠️ Point `repository-url` at your own repo/fork. Production needs a hosted database — see [Deployment](#-deployment).
 
@@ -71,8 +73,7 @@ This repo shows the **entire integration** in a small, readable codebase you can
 **Prerequisites**
 
 - 🟢 Node.js 20+
-- 🔑 An [Anthropic API key](https://console.anthropic.com/)
-- 🔑 A Naive workspace API key (+ optional Account Kit) from the [Naive dashboard](https://usenaive.ai)
+- 🔑 A Naive workspace API key (+ optional Account Kit) from the [Naive dashboard](https://usenaive.ai) — the only provider key you need; chat + LLM route through Naive
 
 **1. Get your Naive credentials**
 
@@ -86,7 +87,7 @@ This repo shows the **entire integration** in a small, readable codebase you can
 cp .env.example .env
 ```
 
-Fill in the values (see [Environment variables](#-environment-variables)). Minimum: `ANTHROPIC_API_KEY`, `NAIVE_API_KEY`, `BETTER_AUTH_SECRET`.
+Fill in the values (see [Environment variables](#-environment-variables)). Minimum: `NAIVE_API_KEY`, `BETTER_AUTH_SECRET`.
 
 **3. Install, migrate, run**
 
@@ -110,13 +111,13 @@ The **entire Naive integration lives in three files** — read these:
 
 - 1️⃣ **Provision on signup** → [`lib/auth.ts`](lib/auth.ts): a BetterAuth `create.after` hook calls `naive.users.create({ external_id })` and stores the id on `user.naiveUserId`.
 - 2️⃣ **Scope to the user** → [`lib/naive.ts`](lib/naive.ts): `requireNaiveUser()` resolves the session to `naive.forUser(naiveUserId)`.
-- 3️⃣ **Give the agent tools** → [`app/api/chat/route.ts`](app/api/chat/route.ts): `client.agentTools()` returns Anthropic tool defs + a `handle()` dispatcher, run in a streaming loop.
+- 3️⃣ **Give the agent tools** → [`app/api/chat/route.ts`](app/api/chat/route.ts): `client.agentTools()` returns the tool defs + a `handle()` dispatcher, run in a streaming loop. The LLM calls go through Naive's LLM router (`client.llm`, OpenRouter) — any model, billed in Naive credits, no direct provider key (set `NAIVE_LLM_MODEL` to switch models).
 
 ```mermaid
 flowchart LR
   signup["Signup (BetterAuth)"] -->|create hook| provision["naive.users.create()"]
   user["End user"] --> chat["/api/chat"]
-  chat --> claude["Anthropic (tool-use)"]
+  chat --> claude["Naive LLM router -> OpenRouter (tool-use)"]
   claude -->|tool_use| tools["naive.forUser(id).agentTools()"]
   tools --> api["Naive API"]
   api -->|kit-gated| ext["Third-party apps + built-in primitives"]
@@ -138,7 +139,7 @@ flowchart TB
 ### 🛠️ The agent's tools (two lanes, not 1000s of schemas)
 
 - 🌐 **Third-party apps** — `naive_search_apps`, `naive_list_connections`, `naive_connect_app`, `naive_list_capabilities`, `naive_run_capability`. Reaches ~1000 external OAuth apps and all their capabilities.
-- 🧩 **Built-in primitives** — `naive_search_primitives` (discover primitives + methods + arg schemas) and `naive_run_primitive` (execute, e.g. `primitive='cards', method='create'`). Covers cards, email, domains, vault, KYC, formation, social, approvals.
+- 🧩 **Built-in primitives** — `naive_search_primitives` (discover primitives + methods + arg schemas) and `naive_run_primitive` (execute, e.g. `primitive='cards', method='create'`). Covers cards, email, domains, vault, KYC, formation, social, approvals, and `llm` (OpenRouter chat completions).
 
 > 🔁 Same `search → run` pattern for both lanes. `naive_search_apps` is third-party only. Sensitive methods return `pending_approval` and surface in the Approvals tab.
 
@@ -155,9 +156,11 @@ flowchart TB
 .
 ├── app/
 │   ├── api/                 # Server routes — ALL Naive calls happen here
-│   │   ├── chat/route.ts    # 💬 streaming agent loop (agentTools)
+│   │   ├── chat/route.ts    # 💬 streaming agent loop (agentTools + client.llm/OpenRouter)
 │   │   ├── cards/route.ts   # 💳 cards primitive
 │   │   ├── email/route.ts   # 📬 email primitive
+│   │   ├── trading/route.ts # 📈 trading primitive (OAuth + orders)
+│   │   ├── billing/route.ts # 🪙 tenant billing  ·  status/route.ts # workspace credits
 │   │   ├── connections/     # 🔌 third-party app connections
 │   │   ├── vault/route.ts   # 🔐 credentials vault
 │   │   ├── approvals/       # ✅ human-in-the-loop queue
@@ -182,12 +185,13 @@ flowchart TB
 
 | Variable | Required | Description |
 | --- | :---: | --- |
-| `ANTHROPIC_API_KEY` | ✅ | Anthropic API key — the chat LLM. |
-| `NAIVE_API_KEY` | ✅ | Workspace API key (Naive dashboard → Settings → API Keys). |
+| `NAIVE_API_KEY` | ✅ | Workspace API key (Naive dashboard → Settings → API Keys). Powers everything — the chat LLM calls route through Naive's LLM router (OpenRouter), so no direct provider key is needed. |
 | `BETTER_AUTH_SECRET` | ✅ | Session-signing secret. `openssl rand -base64 32`. |
 | `BETTER_AUTH_URL` | ✅ prod | App base URL. `http://localhost:3400` in dev; your deployed URL in prod. |
 | `NAIVE_API_URL` | ➖ | Naive API base. Defaults to `https://api.usenaive.ai`. |
+| `NAIVE_LLM_MODEL` | ➖ | OpenRouter model id for the chat loop. Defaults to `anthropic/claude-sonnet-4.6`. |
 | `NAIVE_ACCOUNT_KIT_ID` | ➖ | Account Kit for new users. Blank = workspace default. |
+| `NAIVE_SHOW_WORKSPACE_CREDITS` | ➖ | Show the shared workspace credit balance in-app (sidebar + Billing). Operator-only — off in prod by default, on in dev. Set `true` for an internal/admin build. |
 | `DATABASE_URL` | ➖ | libSQL/SQLite URL. Defaults to `file:./dev.db`. |
 | `DATABASE_AUTH_TOKEN` | ➖ | Auth token for a hosted libSQL/Turso database. |
 
@@ -208,6 +212,8 @@ npm run build       # production build
 - [ ] 🌐 *"Is `example.com` available?"* → domain check (no purchase)
 - [ ] 🔐 *"Store my OpenAI key as `openai.key`"* → appears in **Credentials**
 - [ ] 💳 *"Issue a $50 virtual card"* → if gated, shows in **Approvals**; approve to run
+- [ ] 📈 *"Connect my brokerage"* then *"buy $25 of BTC"* → OAuth link; order shows in **Approvals** if gated
+- [ ] 🪙 Open **Billing** → workspace credit balance reflects your activity (decrements as you use primitives)
 
 ---
 
@@ -234,7 +240,7 @@ Standard Next.js app — deploys anywhere. For [Vercel](https://vercel.com):
 
 ## 🛟 Troubleshooting
 
-- 🤖 **Agent says a built-in feature "isn't available"** → ensure `@usenaive-sdk/node` is `^0.3.0`+ and restart `npm run dev` (Next caches resolved deps).
+- 🤖 **Agent says a built-in feature "isn't available"** → ensure `@usenaive-sdk/node` is `^0.8.0`+ and restart `npm run dev` (Next caches resolved deps).
 - ⏳ **A sensitive action never runs** → it's waiting in **Approvals** (gated by the Account Kit). Approve it, or relax the kit policy.
 - 🔁 **Auth redirect loops in production** → set `BETTER_AUTH_URL` to your exact deployed origin.
 - 🗄️ **`db:push` fails on Vercel** → run it against the hosted DB with the production `DATABASE_URL`/`DATABASE_AUTH_TOKEN`.
