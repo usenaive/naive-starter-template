@@ -23,9 +23,11 @@ export async function GET() {
   try {
     // Auth-gate on the app session (don't expose this unauthenticated).
     await requireNaiveUser();
+
     if (!workspaceCreditsVisible()) {
       return NextResponse.json({ credits: null, operator_only: true });
     }
+
     const base = (process.env.NAIVE_API_URL || "https://api.usenaive.ai").replace(/\/+$/, "");
     const res = await fetch(`${base}/v1/status`, {
       headers: { Authorization: `Bearer ${process.env.NAIVE_API_KEY}` },

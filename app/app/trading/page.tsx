@@ -45,6 +45,7 @@ export default function TradingPage() {
     if (res.ok) setConnections(data.connections ?? []);
     else setError(data.error);
   }, []);
+
   useEffect(() => { loadConnections(); }, [loadConnections]);
 
   // Once a brokerage is connected, pull the account summary + open positions.

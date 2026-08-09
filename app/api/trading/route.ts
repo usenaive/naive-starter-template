@@ -5,7 +5,6 @@ import { errorResponse } from "@/lib/api-utils";
 // Per-user trading via the SDK (naive.forUser(id).trading.*). One order endpoint
 // trades stocks, options, and crypto — the symbol selects the market. Orders are
 // SENSITIVE, so createOrder may return a pending_approval governed by the kit.
-
 export async function GET() {
   try {
     const { client } = await requireNaiveUser();
@@ -29,6 +28,7 @@ export async function POST(req: Request) {
       time_in_force?: "day" | "gtc" | "ioc";
       env?: "paper" | "live";
     };
+
     const has = (v: unknown) => v !== undefined && v !== null && v !== "";
     if (!symbol || !side || (!has(notional) && !has(qty))) {
       return NextResponse.json(
@@ -36,6 +36,7 @@ export async function POST(req: Request) {
         { status: 400 },
       );
     }
+
     const result = await client.trading.createOrder({
       symbol,
       side,

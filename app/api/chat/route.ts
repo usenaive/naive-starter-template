@@ -90,7 +90,7 @@ export async function POST(req: Request) {
     messages: { role: "user" | "assistant"; content: string }[];
   };
 
-  const kit = client.agentTools(); // <-- Naive tools (incl. business primitives)
+  const kit = client.agentTools(); // <-- Naive tools (incl. business primitives), ready for Claude
 
   // agentTools() returns Anthropic-format tool defs; map them to OpenAI-style
   // tools for the OpenRouter chat-completions API. handle() is format-agnostic.
