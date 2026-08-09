@@ -1,4 +1,4 @@
-import Anthropic from "@anthropic-ai/sdk";
+import type { ChatCompletionRequest } from "@usenaive-sdk/node";
 import { requireNaiveUser } from "@/lib/naive";
 
 /**
@@ -18,10 +18,12 @@ function isPendingApproval(
 }
 
 /**
- * The headline reference: an Anthropic tool-use loop powered entirely by
- * `naive.forUser(id).agentTools()`. The toolset comes straight from the SDK
- * (nothing hardcoded here) and has two lanes — third-party apps and built-in
- * Naive primitives — all gated by the user's Account Kit.
+ * The headline reference: a tool-use loop powered entirely by
+ * `naive.forUser(id).agentTools()`, with the LLM calls routed through Naive's
+ * LLM primitive (a full wrapper over OpenRouter — 300+ models, one key). The
+ * toolset comes straight from the SDK (nothing hardcoded here) and has two
+ * lanes — third-party apps and built-in Naive primitives — all gated by the
+ * user's Account Kit. Swap the model with NAIVE_LLM_MODEL.
  *
  * Streams NDJSON events to the client so the UI renders the reply token-by-token:
  *   {"type":"text","delta":"..."}      assistant text chunk
@@ -56,8 +58,21 @@ approval and ask them to review it in the Approvals tab. You can check status
 with naive_run_primitive (primitive 'approvals', method 'list').
 Be concise.`;
 
-const MODEL = "claude-sonnet-4-5";
+// Any OpenRouter model id works — routed + billed through Naive.
+const MODEL = process.env.NAIVE_LLM_MODEL || "anthropic/claude-sonnet-4.6";
 const MAX_TURNS = 6;
+
+interface ToolCall {
+  id: string;
+  type: "function";
+  function: { name: string; arguments: string };
+}
+interface ChatMsg {
+  role: "system" | "user" | "assistant" | "tool";
+  content: string | null;
+  tool_calls?: ToolCall[];
+  tool_call_id?: string;
+}
 
 export async function POST(req: Request) {
   let client;
@@ -67,18 +82,27 @@ export async function POST(req: Request) {
     return new Response(JSON.stringify({ error: "unauthorized" }), { status: 401, headers: { "Content-Type": "application/json" } });
   }
 
-  if (!process.env.ANTHROPIC_API_KEY) {
-    return new Response(JSON.stringify({ error: "ANTHROPIC_API_KEY is not set" }), { status: 500, headers: { "Content-Type": "application/json" } });
+  if (!process.env.NAIVE_API_KEY) {
+    return new Response(JSON.stringify({ error: "NAIVE_API_KEY is not set" }), { status: 500, headers: { "Content-Type": "application/json" } });
   }
 
   const { messages: incoming } = (await req.json()) as {
     messages: { role: "user" | "assistant"; content: string }[];
   };
 
-  const anthropic = new Anthropic();
   const kit = client.agentTools(); // <-- Naive tools (incl. business primitives), ready for Claude
 
-  const messages: Anthropic.MessageParam[] = incoming.map((m) => ({ role: m.role, content: m.content }));
+  // agentTools() returns Anthropic-format tool defs; map them to OpenAI-style
+  // tools for the OpenRouter chat-completions API. handle() is format-agnostic.
+  const tools = kit.tools.map((t) => ({
+    type: "function" as const,
+    function: { name: t.name, description: t.description, parameters: t.input_schema },
+  }));
+
+  const messages: ChatMsg[] = [
+    { role: "system", content: SYSTEM },
+    ...incoming.map((m) => ({ role: m.role, content: m.content })),
+  ];
 
   const encoder = new TextEncoder();
   const stream = new ReadableStream<Uint8Array>({
@@ -87,35 +111,46 @@ export async function POST(req: Request) {
 
       try {
         for (let turn = 0; turn < MAX_TURNS; turn++) {
-          const ms = anthropic.messages.stream({
-            model: MODEL,
-            max_tokens: 1024,
-            system: SYSTEM,
-            tools: kit.tools as Anthropic.Tool[],
-            messages,
-          });
+          let text = "";
+          const acc: Record<number, ToolCall> = {};
 
-          ms.on("text", (delta) => send({ type: "text", delta }));
+          // Stream one assistant turn through Naive's LLM router (OpenRouter).
+          const body = { model: MODEL, max_tokens: 1024, tools, messages } as unknown as ChatCompletionRequest;
+          for await (const chunk of client.llm.stream(body)) {
+            const delta = chunk.choices?.[0]?.delta as
+              | { content?: string | null; tool_calls?: Array<{ index?: number; id?: string; function?: { name?: string; arguments?: string } }> }
+              | undefined;
+            if (!delta) continue;
+            if (delta.content) {
+              text += delta.content;
+              send({ type: "text", delta: delta.content });
+            }
+            for (const tc of delta.tool_calls ?? []) {
+              const i = tc.index ?? 0;
+              acc[i] ??= { id: "", type: "function", function: { name: "", arguments: "" } };
+              if (tc.id) acc[i].id = tc.id;
+              if (tc.function?.name) acc[i].function.name = tc.function.name;
+              if (tc.function?.arguments) acc[i].function.arguments += tc.function.arguments;
+            }
+          }
 
-          const final = await ms.finalMessage();
-          messages.push({ role: "assistant", content: final.content });
+          const toolCalls = Object.values(acc).filter((c) => c.function.name);
+          const assistant: ChatMsg = { role: "assistant", content: text || null };
+          if (toolCalls.length) assistant.tool_calls = toolCalls;
+          messages.push(assistant);
 
-          const toolUses = final.content.filter(
-            (b): b is Anthropic.ToolUseBlock => b.type === "tool_use",
-          );
-
-          if (toolUses.length === 0) {
+          if (toolCalls.length === 0) {
             send({ type: "done" });
             controller.close();
             return;
           }
 
-          const toolResults: Anthropic.ToolResultBlockParam[] = [];
-          for (const call of toolUses) {
+          for (const call of toolCalls) {
             let ok = true;
             let out: unknown;
             try {
-              out = await kit.handle(call.name, call.input as Record<string, unknown>);
+              const input = call.function.arguments ? JSON.parse(call.function.arguments) : {};
+              out = await kit.handle(call.function.name, input as Record<string, unknown>);
               if (isPendingApproval(out)) {
                 send({ type: "pending", id: out.approval_id, action: out.action, title: out.title });
               }
@@ -123,16 +158,13 @@ export async function POST(req: Request) {
               ok = false;
               out = { error: e instanceof Error ? e.message : "tool failed" };
             }
-            send({ type: "tool", name: call.name, ok });
-            toolResults.push({
-              type: "tool_result",
-              tool_use_id: call.id,
+            send({ type: "tool", name: call.function.name, ok });
+            messages.push({
+              role: "tool",
+              tool_call_id: call.id,
               content: JSON.stringify(out).slice(0, 12000),
-              is_error: !ok,
             });
           }
-
-          messages.push({ role: "user", content: toolResults });
         }
 
         send({ type: "text", delta: "\n\n_(I hit the tool-call limit for this turn. Try narrowing the request.)_" });

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { MessageSquare, Plug, KeyRound, CreditCard, Mail, CheckSquare, LogOut } from "lucide-react";
+import { MessageSquare, Plug, KeyRound, CreditCard, Mail, CheckSquare, LogOut, LineChart, Coins } from "lucide-react";
 
 function NewChatIcon({ className }: { className?: string }) {
   return (
@@ -25,6 +25,7 @@ const SECTIONS: { label: string; items: { href: string; label: string; icon: Rea
     items: [
       { href: "/app/cards", label: "Cards", icon: CreditCard },
       { href: "/app/email", label: "Email", icon: Mail },
+      { href: "/app/trading", label: "Trading", icon: LineChart },
     ],
   },
   {
@@ -33,6 +34,7 @@ const SECTIONS: { label: string; items: { href: string; label: string; icon: Rea
       { href: "/app/connections", label: "Connections", icon: Plug },
       { href: "/app/credentials", label: "Credentials", icon: KeyRound },
       { href: "/app/approvals", label: "Approvals", icon: CheckSquare },
+      { href: "/app/billing", label: "Billing", icon: Coins },
     ],
   },
 ];
@@ -41,6 +43,23 @@ export function Sidebar({ email, name }: { email: string; name?: string | null }
   const pathname = usePathname();
   const router = useRouter();
   const [pendingApprovals, setPendingApprovals] = useState(0);
+  const [credits, setCredits] = useState<number | null>(null);
+
+  // Poll workspace credit balance so you can see when to top up.
+  useEffect(() => {
+    let alive = true;
+    const tick = async () => {
+      try {
+        const res = await fetch("/api/status");
+        if (!res.ok) return;
+        const data = await res.json();
+        if (alive && data.credits) setCredits(data.credits.balance);
+      } catch { /* ignore */ }
+    };
+    tick();
+    const t = setInterval(tick, 30000);
+    return () => { alive = false; clearInterval(t); };
+  }, [pathname]);
 
   // Poll the pending-approval count so the nav badge stays current.
   useEffect(() => {
@@ -110,6 +129,12 @@ export function Sidebar({ email, name }: { email: string; name?: string | null }
       </nav>
 
       <div className="p-2.5">
+        {credits !== null && (
+          <Link href="/app/billing" title="Workspace credits (operator view — shared across all users)" className="mb-1.5 flex items-center justify-between rounded-xl border border-border px-3 py-2 text-[12px] transition-colors hover:bg-white/[0.06]">
+            <span className="flex items-center gap-1.5 text-muted-foreground"><Coins className="h-3.5 w-3.5" /> Credits</span>
+            <span className={`font-mono tabular-nums ${credits <= 0 ? "text-[var(--red)]" : credits < 5 ? "text-[var(--amber)]" : "text-foreground"}`}>{credits.toFixed(2)}</span>
+          </Link>
+        )}
         <div className="flex items-center gap-2.5 rounded-xl px-2 py-2 transition-colors hover:bg-white/[0.06]">
           <div className="flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-[12px] font-medium">
             {(name ?? email)[0]?.toUpperCase()}

@@ -12,6 +12,7 @@ const SUGGESTIONS = [
   "What can you do for me?",
   "Connect my GitHub",
   "Issue a $50 virtual card",
+  "Connect my brokerage and buy $25 of BTC",
 ];
 
 // Conversation is persisted client-side so a page refresh keeps the history.
@@ -173,7 +174,7 @@ export default function ChatPage() {
             </button>
           ))}
         </div>
-        <p className="mt-6 text-[12px] text-muted-foreground">Powered by Claude + Naive tools.</p>
+        <p className="mt-6 text-[12px] text-muted-foreground">Powered by Naive&rsquo;s LLM router (OpenRouter) + tools.</p>
       </div>
     );
   }
